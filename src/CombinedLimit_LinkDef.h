@@ -22,6 +22,7 @@
 #include "../interface/RooMultiPdf.h"
 #include "../interface/RooBernsteinFast.h"
 #include "../interface/SimpleGaussianConstraint.h"
+#include "../interface/RooRazor3DBinPdf.h"
 
 #ifdef __CINT__
 #pragma link off all globals;
@@ -46,6 +47,7 @@
 #pragma link C++ class TH1Keys+;
 #pragma link C++ class RooSimultaneousOpt+;
 #pragma link C++ class SimpleGaussianConstraint+;
+#pragma link C++ class RooRazor3DBinPdf+;
 #pragma link C++ class SimpleCacheSentry+;
 #pragma link C++ function th1fmorph;
 #pragma link C++ class RooqqZZPdf+;
