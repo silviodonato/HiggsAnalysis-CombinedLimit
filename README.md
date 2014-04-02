@@ -8,7 +8,7 @@ HiggsAnalysis-CombinedLimit
 cmsrel CMSSW_6_1_2
 cd CMSSW_6_1_2/src/
 cmsenv
-git clone https://github.com:RazorCMS/HiggsAnalysis-CombinedLimit.git HiggsAnalysis/CombinedLimit
+git clone git@github.com:RazorCMS/HiggsAnalysis-CombinedLimit.git HiggsAnalysis/CombinedLimit
 cd HiggsAnalysis/CombinedLimit
 git pull origin razor1dpdf
 scramv1 b clean; scramv1 b
