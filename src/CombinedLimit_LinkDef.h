@@ -27,6 +27,7 @@
 #include "../interface/HZZ4L_RooSpinZeroPdf_phase.h"
 #include "../interface/HZZ4L_RooSpinZeroPdf_2D.h"
 #include "../interface/HWWLVJJRooPdfs.h"
+#include "../interface/RooRazor3DBinPdf.h"
 
 #ifdef __CINT__
 #pragma link off all globals;
@@ -56,6 +57,7 @@
 #pragma link C++ class TH1Keys+;
 #pragma link C++ class RooSimultaneousOpt+;
 #pragma link C++ class SimpleGaussianConstraint+;
+#pragma link C++ class RooRazor3DBinPdf+;
 #pragma link C++ class SimpleCacheSentry+;
 #pragma link C++ function th1fmorph;
 #pragma link C++ class RooqqZZPdf+;
