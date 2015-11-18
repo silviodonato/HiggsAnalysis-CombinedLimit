@@ -20,6 +20,7 @@
 #include "../interface/RooScaleLOSM.h"
 #include "../interface/rVrFLikelihood.h"
 #include "../interface/RooMultiPdf.h"
+#include "../interface/RooParametricHist.h"
 #include "../interface/RooBernsteinFast.h"
 #include "../interface/SimpleGaussianConstraint.h"
 #include "../interface/AtlasPdfs.h"
@@ -30,6 +31,7 @@
 #include "../interface/RooRazor3DBinPdf.h"
 #include "../interface/RooRazor3DBinMRSlopePdf.h"
 #include "../interface/RooRazor3DBinNumericPdf.h"
+#include "../interface/RooMorphingPdf.h"
 
 #ifdef __CINT__
 #pragma link off all globals;
@@ -120,6 +122,7 @@
 #pragma link C++ class RooGaussStepBernstein+;
 #pragma link C++ class rVrFLikelihood+;
 #pragma link C++ class RooMultiPdf+;
+#pragma link C++ class RooParametricHist+;
 #pragma link C++ class RooBernsteinFast<1>+;
 #pragma link C++ class RooBernsteinFast<2>+;
 #pragma link C++ class RooBernsteinFast<3>+;
@@ -143,6 +146,7 @@
 #pragma link C++ class RooParamKeysPdf+;
 #pragma link C++ class RooStarMomentMorph+;
 
+#pragma link C++ class RooMorphingPdf+;
 #pragma link C++ class RooSigPlusInt+;
 #pragma link C++ class RooBWHighMassGGH+;
 #pragma link C++ class RooCPSHighMassGGH+;
@@ -158,5 +162,4 @@
 #pragma link C++ class RooPowerExpPdf+;
 #pragma link C++ class RooErfPdf+;
 #pragma link C++ class RooChebyshevPDF+;
-
 #endif 
