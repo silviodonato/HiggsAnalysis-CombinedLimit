@@ -28,6 +28,7 @@
 #include "HiggsAnalysis/CombinedLimit/interface/HZZ4L_RooSpinZeroPdf_2D.h"
 #include "HiggsAnalysis/CombinedLimit/interface/HWWLVJJRooPdfs.h"
 #include "HiggsAnalysis/CombinedLimit/interface/RooRazor3DBinPdf.h"
+#include "HiggsAnalysis/CombinedLimit/interface/RooRazor3DBinMRSlopePdf.h"
 #include "HiggsAnalysis/CombinedLimit/interface/RooRazor3DBinNumericPdf.h"
 
 namespace {

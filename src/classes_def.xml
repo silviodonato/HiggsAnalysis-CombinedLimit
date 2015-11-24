@@ -75,6 +75,7 @@
 	<class name="RooQCDPdf" />
 	<class name="RooRazor3DBinNumericPdf" />
 	<class name="RooRazor3DBinPdf" />
+	<class name="RooRazor3DBinMRSlopePdf" />
 	<class name="RooRelBW" />
 	<class name="RooRelBW1" />
 	<class name="RooRelBWHighMass" />
