@@ -31,6 +31,8 @@
 #include "../interface/RooRazor3DBinPdf.h"
 #include "../interface/RooRazor3DBinMRSlopePdf.h"
 #include "../interface/RooRazor3DBinNumericPdf.h"
+#include "../interface/RooRazor3DBinErrorPdf.h"
+#include "../interface/RooRazor3DBinMRSlopeErrorPdf.h"
 #include "../interface/RooMorphingPdf.h"
 
 #ifdef __CINT__
@@ -64,6 +66,8 @@
 #pragma link C++ class RooRazor3DBinPdf+;
 #pragma link C++ class RooRazor3DBinMRSlopePdf+;
 #pragma link C++ class RooRazor3DBinNumericPdf+;
+#pragma link C++ class RooRazor3DBinErrorPdf+;
+#pragma link C++ class RooRazor3DBinMRSlopeErrorPdf+;
 #pragma link C++ class SimpleCacheSentry+;
 #pragma link C++ function th1fmorph;
 #pragma link C++ class RooqqZZPdf+;
