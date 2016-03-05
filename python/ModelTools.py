@@ -99,20 +99,25 @@ class ModelBuilder(ModelBuilderBase):
     def doRateParams(self):
 	# First do independant parameters, then expressions
 	for rp in self.DC.rateParams.keys():
-	  type = self.DC.rateParams[rp][-1]
+	 for rk in range(len(self.DC.rateParams[rp])):
+	  type = self.DC.rateParams[rp][rk][0][-1]
 	  if type!=0: continue
-	  argu,argv = self.DC.rateParams[rp][0],self.DC.rateParams[rp][1]
+	  param_range = (self.DC.rateParams[rp][rk][1]).strip('[]')
+	  argu,argv = self.DC.rateParams[rp][rk][0][0],self.DC.rateParams[rp][rk][0][1]
 	  if self.out.arg(argu): continue
 
-	  self.doVar("%s[%s,0,1]"%(argu,argv))
-	  self.out.var(argu).removeRange()
+	  removeRange = (len(param_range)==0)
+	  if param_range == "": param_range = "0,1" 
+	  self.doVar("%s[%s,%s]"%(argu,argv,param_range))
+	  if removeRange: self.out.var(argu).removeRange()
 	  self.out.var(argu).setConstant(False)
 	  self.out.var(argu).setAttribute("flatParam")
 
 	for rp in self.DC.rateParams.keys():
-	  type = self.DC.rateParams[rp][-1]
+	 for rk in range(len(self.DC.rateParams[rp])):
+	  type = self.DC.rateParams[rp][rk][0][-1]
 	  if type!=1: continue
-	  argu,arge,argv = self.DC.rateParams[rp][0],self.DC.rateParams[rp][1],self.DC.rateParams[rp][2]
+	  argu,arge,argv = self.DC.rateParams[rp][rk][0][0],self.DC.rateParams[rp][rk][0][1],self.DC.rateParams[rp][rk][0][2]
 	  if self.out.arg(argu): continue
 	  self.doExp(argu,arge,argv)
 
@@ -140,7 +145,7 @@ class ModelBuilder(ModelBuilderBase):
         #print groupsFor
         for cpar in self.DC.discretes: self.addDiscrete(cpar)
         for (n,nofloat,pdf,args,errline) in self.DC.systs: 
-            if pdf == "lnN" or pdf.startswith("shape"):
+            if pdf == "lnN" or (pdf.startswith("shape") and pdf != 'shapeU'):
                 r = "-4,4" if pdf == "shape" else "-7,7"
                 sig = 1.0;
                 for pn,pf in self.options.nuisancesToRescale:
@@ -208,7 +213,7 @@ class ModelBuilder(ModelBuilderBase):
                 globalobs.append("%s_In" % n)
                 if self.options.bin:
                   self.out.var("%s_In" % n).setConstant(True)
-            elif pdf == "lnU":
+            elif pdf == "lnU" or pdf == "shapeU":
                 self.doObj("%s_Pdf" % n, "Uniform", "%s[-1,1]" % n);
             elif pdf == "unif":
                 self.doObj("%s_Pdf" % n, "Uniform", "%s[%f,%f]" % (n,args[0],args[1]))
@@ -338,7 +343,8 @@ class ModelBuilder(ModelBuilderBase):
 
 		# look for rate param for this bin 
 		if "%sAND%s"%(b,p) in self.DC.rateParams.keys():
-		    argu = self.DC.rateParams["%sAND%s"%(b,p)][0]
+		  for rk in range(len(self.DC.rateParams["%sAND%s"%(b,p)])):
+		    argu = self.DC.rateParams["%sAND%s"%(b,p)][rk][0][0]
 		    if self.out.arg(argu): factors.append(argu)
 		    else: raise RuntimeError, "No rate parameter found %s, are you sure you defined it correctly in the datacard?"%(argu)
 
