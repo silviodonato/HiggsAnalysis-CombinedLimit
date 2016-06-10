@@ -136,17 +136,25 @@ toymcoptutils::SinglePdfGenInfo::generateAsimov(RooRealVar *&weightVar, double w
     int boostAPA = runtimedef::get("TMCSO_AdaptivePseudoAsimov");
     if (observables_.getSize() > 1 && boostAPA) {
         int nbins = 1;
+	std::cout << nbins << std::endl;
         RooLinkedListIter iter = observables_.iterator(); 
         for (RooAbsArg *a = (RooAbsArg *) iter.Next(); a != 0; a = (RooAbsArg *) iter.Next()) {
             RooRealVar *rrv = dynamic_cast<RooRealVar *>(a); 
             int mybins = rrv->getBins();
-            nbins *= (mybins ? mybins : 100);
+            
+	    std::cout << "=========================" << std::endl;
+	    std::cout << "combine: " <<  nbins << std::endl;
+	    nbins *= (mybins ? mybins : 100);
+	    std::cout << "combine: " <<  nbins << std::endl;
+	    std::cout << "=========================" << std::endl;
+	    
         }
+	std::cout << nbins << std::endl;
         //printf("generating asimov from %s: bins %d\n", pdf_->GetName(), nbins);
         if (nbins > 5000) {
             double nev = pdf_->expectedEvents(observables_);
-            //printf("generating asimov from %s: bins %d, events %.1f\n",
-            //                    pdf_->GetName(), nbins, nev );
+            printf("generating asimov from %s: bins %d, events %.1f\n",
+                                pdf_->GetName(), nbins, nev );
             if (nev < 0.01*nbins) {
                 nPA = std::max<int>(100*nev, 1000) * boostAPA;
                 //printf("generating asimov from %s: bins %d, events %.1f --> pseudo-asimov entries %d\n",
@@ -154,7 +162,9 @@ toymcoptutils::SinglePdfGenInfo::generateAsimov(RooRealVar *&weightVar, double w
             }
         }
     }
+    std::cout << "combine1: " << std::endl;
     if (nPA) return generatePseudoAsimov(weightVar, nPA, weightScale);
+    std::cout << "combine2: " << std::endl;
     return generateWithHisto(weightVar, true, weightScale);
 }
 
@@ -206,6 +216,7 @@ toymcoptutils::SinglePdfGenInfo::generateWithHisto(RooRealVar *&weightVar, bool 
     RooAbsArg::setDirtyInhibit(true); // don't propagate dirty flags while filling histograms 
     switch (obs.getSize()) {
         case 1:
+	  std::cout << "NBINS HISTO:" << histoSpec_->GetNbinsX() << std::endl;
             for (int i = 1, n = histoSpec_->GetNbinsX(); i <= n; ++i) {
                 x->setVal(histoSpec_->GetXaxis()->GetBinCenter(i));
                 double w = histoSpec_->GetXaxis()->GetBinWidth(i);

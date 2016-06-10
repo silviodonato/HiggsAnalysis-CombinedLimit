@@ -32,6 +32,7 @@
 #include "HiggsAnalysis/CombinedLimit/interface/RooMorphingPdf.h"
 #include "HiggsAnalysis/CombinedLimit/interface/RooParametricHist.h"
 #include "HiggsAnalysis/CombinedLimit/interface/GaussExp.h"
+#include "HiggsAnalysis/CombinedLimit/interface/RooPowLogPdf.h"
 
 namespace {
     struct dictionary {
@@ -42,5 +43,7 @@ namespace {
 	RooBernsteinFast<5> my_RooBernsteinFast_5;
 	RooBernsteinFast<6> my_RooBernsteinFast_6;
 	RooBernsteinFast<7> my_RooBernsteinFast_7;
+
+        RooPowLogPdf powlogpdf;
     };
 }

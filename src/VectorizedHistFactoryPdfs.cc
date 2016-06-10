@@ -130,6 +130,8 @@ const std::vector<Double_t> & cacheutils::CachingPiecewiseInterpolation::eval(co
     work_.resize(size);
     std::copy(nominal.begin(), nominal.end(), work_.begin());
     for (int i = 0, n =  coeffs_.size(); i < n; ++i) {
+        const std::vector<Double_t> & hi = cachingPdfsHi_[i].eval(data);
+        const std::vector<Double_t> & lo = cachingPdfsLow_[i].eval(data);
         double param = coeffs_[i]->getVal();
         int    code  = codes_[i];
         switch(code){
@@ -155,7 +157,7 @@ const std::vector<Double_t> & cacheutils::CachingPiecewiseInterpolation::eval(co
                             work_[j] *= std::pow(hi[j]/nominal[j], param);
                         }
                     } else {
-                        const std::vector<Double_t> & lo = cachingPdfsLow_[i].eval(data);
+                        const std::vector<Double_t> & hi = cachingPdfsHi_[i].eval(data);
                         for (unsigned int j = 0; j < size; ++j) {
                             work_[j] *= std::pow(lo[j]/nominal[j], -param);
                         }

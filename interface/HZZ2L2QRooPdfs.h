@@ -5,6 +5,67 @@
 #include "RooRealProxy.h"
 #include "RooAbsReal.h"
 
+
+
+class RooHMDiphoton : public RooAbsPdf {
+ public:
+  RooHMDiphoton();
+  RooHMDiphoton(const char *name, const char *title,
+		RooAbsReal& _x,
+		RooAbsReal& _a,
+		RooAbsReal& _b
+		);
+  RooHMDiphoton(const RooHMDiphoton& other, const char* name=0) ;
+  virtual TObject* clone(const char* newname) const { return new RooHMDiphoton(*this,newname); }
+  inline virtual ~RooHMDiphoton() { };
+  
+ protected:
+  
+  RooRealProxy x ;
+  RooRealProxy a;
+  RooRealProxy b;
+  
+  Double_t evaluate() const ;
+  
+ private:
+  
+  ClassDef(RooHMDiphoton,1)
+
+};
+
+//RooDoubleCBInterpolate
+class RooDoubleCBInterpolate : public RooAbsPdf {
+ public:
+  RooDoubleCBInterpolate();
+  RooDoubleCBInterpolate(const char *name, const char *title,
+			 RooAbsReal& _x,
+			  RooAbsReal& _mass
+			 );
+  RooDoubleCBInterpolate(const RooDoubleCBInterpolate& other, const char* name=0) ;
+  virtual TObject* clone(const char* newname) const { return new RooDoubleCBInterpolate(*this,newname); }
+  inline virtual ~RooDoubleCBInterpolate() { }
+  Int_t getAnalyticalIntegral(RooArgSet& allVars, RooArgSet& analVars, const char* rangeName=0) const ;
+  Double_t analyticalIntegral(Int_t code, const char* rangeName=0) const ;
+  Double_t getMean( Double_t m ) const;
+  Double_t getSigma( Double_t m ) const;
+  Double_t getN1( Double_t m) const;
+  Double_t getAlpha1( Double_t m ) const;
+  Double_t getN2( Double_t m ) const;
+  Double_t getAlpha2( Double_t m ) const;
+  
+  
+ protected:
+  
+  RooRealProxy x ;
+  RooRealProxy mass;
+  
+  Double_t evaluate() const ;
+  
+ private:
+  
+  ClassDef(RooDoubleCBInterpolate,1)
+};
+
 class RooCB : public RooAbsPdf {
  public:
   RooCB();
@@ -191,5 +252,75 @@ class RooLevelledExp : public RooAbsPdf {
   ClassDef(RooLevelledExp,1)
     };
 
+//-------------------------------------
+//RooIntepolateDSCB_W0p014_Spin0_EBEB
+//--------------------------------------
+class RooIntepolateDSCB_W0p014_Spin0_EBEB : public RooAbsPdf {
+public:
+  RooIntepolateDSCB_W0p014_Spin0_EBEB();
+  RooIntepolateDSCB_W0p014_Spin0_EBEB(const char *name, const char *title,
+			 RooAbsReal& _x,
+			 RooAbsReal& _mass
+			 );
+  RooIntepolateDSCB_W0p014_Spin0_EBEB(const RooIntepolateDSCB_W0p014_Spin0_EBEB& other, const char* name=0) ;
+  virtual TObject* clone(const char* newname) const { return new RooIntepolateDSCB_W0p014_Spin0_EBEB(*this,newname); }
+  inline virtual ~RooIntepolateDSCB_W0p014_Spin0_EBEB() { }
+  Int_t getAnalyticalIntegral(RooArgSet& allVars, RooArgSet& analVars, const char* rangeName=0) const ;
+  Double_t analyticalIntegral(Int_t code, const char* rangeName=0) const ;
+  Double_t getMean( Double_t m ) const;
+  Double_t getSigma( Double_t m ) const;
+  Double_t getN1( Double_t m) const;
+  Double_t getAlpha1( Double_t m ) const;
+  Double_t getN2( Double_t m ) const;
+  Double_t getAlpha2( Double_t m ) const;
+  
+  
+protected:
+
+  RooRealProxy x ;
+  RooRealProxy mass;
+  
+  Double_t evaluate() const ;
+  
+private:
+
+  ClassDef(RooIntepolateDSCB_W0p014_Spin0_EBEB,1)
+};
+
+//-----------------------------------
+//RooIntepolateDSCB_W0p014_Spin0_EBEE
+//----------------------------------
+class RooIntepolateDSCB_W0p014_Spin0_EBEE : public RooAbsPdf {
+public:
+  RooIntepolateDSCB_W0p014_Spin0_EBEE();
+  RooIntepolateDSCB_W0p014_Spin0_EBEE(const char *name, const char *title,
+			 RooAbsReal& _x,
+			 RooAbsReal& _mass
+			 );
+  RooIntepolateDSCB_W0p014_Spin0_EBEE(const RooIntepolateDSCB_W0p014_Spin0_EBEE& other, const char* name=0) ;
+  virtual TObject* clone(const char* newname) const { return new RooIntepolateDSCB_W0p014_Spin0_EBEE(*this,newname); }
+  inline virtual ~RooIntepolateDSCB_W0p014_Spin0_EBEE() { }
+  Int_t getAnalyticalIntegral(RooArgSet& allVars, RooArgSet& analVars, const char* rangeName=0) const ;
+  Double_t analyticalIntegral(Int_t code, const char* rangeName=0) const ;
+  Double_t getMean( Double_t m ) const;
+  Double_t getSigma( Double_t m ) const;
+  Double_t getN1( Double_t m) const;
+  Double_t getAlpha1( Double_t m ) const;
+  Double_t getN2( Double_t m ) const;
+  Double_t getAlpha2( Double_t m ) const;
+  
+  
+protected:
+
+  RooRealProxy x ;
+  RooRealProxy mass;
+  
+  Double_t evaluate() const ;
+  
+private:
+
+  ClassDef(RooIntepolateDSCB_W0p014_Spin0_EBEE,1)
+};
+//-------------------------------------
 
 #endif
