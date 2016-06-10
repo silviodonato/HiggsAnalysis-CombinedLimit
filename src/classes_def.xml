@@ -117,6 +117,7 @@
 	<class name="GaussExp" />
 	<class name="RooParametricHist" />
 	<class name="RooDijetBinPdf" />	
+	<class name="PdfDiagonalizer" />	
 	<class name="RooMorphingPdf" />
         <function name="function th1fmorph" />
 
