@@ -15,6 +15,7 @@
 #include "TStyle.h"
 #include "TH2.h"
 #include "TFile.h"
+#include "TLatex.h"
 #include <RooStats/ModelConfig.h>
 #include "HiggsAnalysis/CombinedLimit/interface/Combine.h"
 #include "HiggsAnalysis/CombinedLimit/interface/ProfileLikelihood.h"
@@ -46,6 +47,33 @@ bool        MaxLikelihoodFit::skipBOnlyFit_ = false;
 bool        MaxLikelihoodFit::noErrors_ = false;
 bool        MaxLikelihoodFit::reuseParams_ = false;
 bool        MaxLikelihoodFit::customStartingPoint_ = false;
+
+// For H->GG razor analysis plot style (added by Dustin)
+void AddHiggsToGammaGammaRazorPlotStyle( TCanvas *c, std::string name ) {
+    c->cd();
+    std::string binStr = "";
+    size_t nToRemove = 0;
+    if( name.find("bin") != std::string::npos ) {
+        nToRemove = 3; // length of "bin"
+        binStr = "Bin ";
+    }
+    else if( name.find("highResBin") != std::string::npos ) {
+        nToRemove = 10;
+        binStr = "HighRes Bin ";
+    }
+    else if( name.find("lowResBin") != std::string::npos ) {
+        nToRemove = 9;
+        binStr = "LowRes Bin ";
+    }
+    binStr = "#bf{"+binStr+name.substr(nToRemove)+"}";
+
+    TLatex *tex = new TLatex(0.9, 0.85, binStr.c_str());
+    tex->SetNDC();
+    tex->SetTextSize(0.07);
+    tex->SetTextAlign(31);
+    tex->SetTextFont(42);
+    tex->Draw();
+}
 
 
 MaxLikelihoodFit::MaxLikelihoodFit() :
@@ -139,6 +167,7 @@ bool MaxLikelihoodFit::runSpecific(RooWorkspace *w, RooStats::ModelConfig *mc_s,
       std::vector<RooPlot *> plots = utils::makePlots(*mc_s->GetPdf(), data, signalPdfNames_.c_str(), backgroundPdfNames_.c_str(), rebinFactor_);
       for (std::vector<RooPlot *>::iterator it = plots.begin(), ed = plots.end(); it != ed; ++it) {
           (*it)->Draw(); 
+          AddHiggsToGammaGammaRazorPlotStyle(c1,(*it)->GetName());
           c1->Print((out_+"/"+(*it)->GetName()+"_prefit.png").c_str());
           if (fitOut.get() && currentToy_< 1) fitOut->WriteTObject(*it, (std::string((*it)->GetName())+"_prefit").c_str());
       }
@@ -225,6 +254,7 @@ bool MaxLikelihoodFit::runSpecific(RooWorkspace *w, RooStats::ModelConfig *mc_s,
           std::vector<RooPlot *> plots = utils::makePlots(*mc_b->GetPdf(), data, signalPdfNames_.c_str(), backgroundPdfNames_.c_str(), rebinFactor_);
           for (std::vector<RooPlot *>::iterator it = plots.begin(), ed = plots.end(); it != ed; ++it) {
               c1->cd(); (*it)->Draw(); 
+              AddHiggsToGammaGammaRazorPlotStyle(c1,(*it)->GetName());
               c1->Print((out_+"/"+(*it)->GetName()+"_fit_b.png").c_str());
               if (fitOut.get() && currentToy_< 1) fitOut->WriteTObject(*it, (std::string((*it)->GetName())+"_fit_b").c_str());
           }
@@ -297,6 +327,7 @@ bool MaxLikelihoodFit::runSpecific(RooWorkspace *w, RooStats::ModelConfig *mc_s,
           std::vector<RooPlot *> plots = utils::makePlots(*mc_s->GetPdf(), data, signalPdfNames_.c_str(), backgroundPdfNames_.c_str(), rebinFactor_);
           for (std::vector<RooPlot *>::iterator it = plots.begin(), ed = plots.end(); it != ed; ++it) {
               c1->cd(); (*it)->Draw(); 
+              AddHiggsToGammaGammaRazorPlotStyle(c1,(*it)->GetName());
               c1->Print((out_+"/"+(*it)->GetName()+"_fit_s.png").c_str());
               if (fitOut.get() && currentToy_< 1) fitOut->WriteTObject(*it, (std::string((*it)->GetName())+"_fit_s").c_str());
           }
