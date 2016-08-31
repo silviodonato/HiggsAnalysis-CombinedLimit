@@ -106,6 +106,7 @@ class ModelBuilder(ModelBuilderBase):
 	self.doRateParams()
         self.doExpectedEvents()
         self.doIndividualModels()
+        self.doNuisancesGroups() # this needs to be called after both doNuisances and doIndividualModels
         self.doCombination()
 	self.runPostProcesses()
         self.physics.done()
@@ -126,23 +127,43 @@ class ModelBuilder(ModelBuilderBase):
 	for rp in self.DC.extArgs.keys():
 	  if self.out.arg(rp): continue
 	  argv = self.DC.extArgs[rp][-1]
-	  fin,wsn = argv.split(":")
-	  if (fin,wsn) in open_files: 
-	        wstmp = open_files[(fin,wsn)]
-	        if not wstmp.arg(rp): 
-	         raise RuntimeError, "No parameter '%s' found for extArg in workspace %s from file %s"%(rp,wsn,fin)
-	        self.out._import(wstmp.arg(rp))
+	  if ":" in argv:
+	    fin,wsn = argv.split(":")
+	    if (fin,wsn) in open_files: 
+		  wstmp = open_files[(fin,wsn)]
+		  if not wstmp.arg(rp): 
+		   raise RuntimeError, "No parameter '%s' found for extArg in workspace %s from file %s"%(rp,wsn,fin)
+		  self.out._import(wstmp.arg(rp))
+	    else:
+	      try:
+		fitmp = ROOT.TFile.Open(fin)
+		wstmp = fitmp.Get(wsn)
+		if not wstmp.arg(rp): 
+		 raise RuntimeError, "No parameter '%s' found for extArg in workspace %s from file %s"%(rp,wsn,fin)
+		self.out._import(wstmp.arg(rp))
+		open_files[(fin,wsn)] = wstmp
+	      except: 
+		raise RuntimeError, "No File '%s' found for extArg, or workspace '%s' not in file "%(fin,wsn)
 	  else:
-	    try:
-	      fitmp = ROOT.TFile.Open(fin)
-	      wstmp = fitmp.Get(wsn)
-	      if not wstmp.arg(rp): 
-	       raise RuntimeError, "No parameter '%s' found for extArg in workspace %s from file %s"%(rp,wsn,fin)
-	      self.out._import(wstmp.arg(rp))
-	      open_files[(fin,wsn)] = wstmp
-	    except: 
-	      raise RuntimeError, "No File '%s' found for extArg, or workspace '%s' not in file "%(fin,wsn)
+	      param_range = ""
+	      param_val   = self.DC.extArgs[rp][-1]
+	      if len(self.DC.extArgs[rp])>3: # range is included: 
+	        param_range = self.DC.extArgs[rp][-1]
+	        param_val   = self.DC.extArgs[rp][-2]
+	    	if "[" not in param_range: 
+			  raise RuntimeError, "Expected range arguments [min,max] for extArg %s "%(rp)
+	  	param_range = param_range.strip('[]')
+	      
+	      removeRange = False
+	      if param_range == "": 
+	      	param_range = "0,1" 
+		removeRange=True
 
+	      self.doVar("%s[%s,%s]"%(rp,float(param_val),param_range))
+	      if removeRange: self.out.var(rp).removeRange()
+	      self.out.var(rp).setConstant(False)
+	      self.out.var(rp).setAttribute("flatParam")
+	  	
     def doRateParams(self):
 
     	# First support external functions/parameters
@@ -205,20 +226,7 @@ class ModelBuilder(ModelBuilderBase):
         if len(self.DC.systs) == 0: return
         self.doComment(" ----- nuisances -----")
         globalobs = []
-        # Prepare a dictionary of which group a certain nuisance belongs to
-        groupsFor = {}
-        existingNuisanceNames = tuple(syst[0] for syst in self.DC.systs)
-        for groupName,nuisanceNames in self.DC.groups.iteritems():
-            for nuisanceName in nuisanceNames:
-                if nuisanceName not in existingNuisanceNames:
-                    raise RuntimeError, 'Nuisance group "%(groupName)s" refers to nuisance "%(nuisanceName)s" but it does not exist. Perhaps you misspelled it.' % locals()
-                if nuisanceName in groupsFor:
-                    groupsFor[nuisanceName].append(groupName)
-                else:
-                    groupsFor[nuisanceName] = [ groupName ]
 
-        #print self.DC.groups
-        #print groupsFor
         for cpar in self.DC.discretes: self.addDiscrete(cpar)
         for (n,nofloat,pdf,args,errline) in self.DC.systs: 
             if pdf == "lnN" or (pdf.startswith("shape") and pdf != 'shapeU'):
@@ -361,13 +369,6 @@ class ModelBuilder(ModelBuilderBase):
             else: raise RuntimeError, "Unsupported pdf %s" % pdf
             if nofloat: 
               self.out.var(n).setAttribute("globalConstrained",True)
-            # set an attribute related to the group(s) this nuisance belongs to
-            if n in groupsFor:
-                groupNames = groupsFor[n]
-                if self.options.verbose > 1:
-                    print 'Nuisance "%(n)s" is assigned to the following nuisance groups: %(groupNames)s' % locals()
-                for groupName in groupNames:
-                    self.out.var(n).setAttribute('group_'+groupName,True)
             #self.out.var(n).Print('V')
             if n in self.DC.frozenNuisances:
                 self.out.var(n).setConstant(True)
@@ -389,11 +390,36 @@ class ModelBuilder(ModelBuilderBase):
             self.doObj("nuisancePdf", "PROD", ",".join(["%s_Pdf" % n for (n,nf,p,a,e) in self.DC.systs]))
             self.doSet("globalObservables", ",".join(globalobs))
 	
+    def doNuisancesGroups(self):
+        # Prepare a dictionary of which group a certain nuisance belongs to
+        groupsFor = {}
+        existingNuisanceNames = tuple(set([syst[0] for syst in self.DC.systs]+self.DC.flatParamNuisances.keys()+self.DC.rateParams.keys()+self.DC.extArgs.keys()+self.DC.discretes))
+        for groupName,nuisanceNames in self.DC.groups.iteritems():
+            for nuisanceName in nuisanceNames:
+                if nuisanceName not in existingNuisanceNames:
+                    raise RuntimeError, 'Nuisance group "%(groupName)s" refers to nuisance "%(nuisanceName)s" but it does not exist. Perhaps you misspelled it.' % locals()
+                if nuisanceName in groupsFor:
+                    groupsFor[nuisanceName].append(groupName)
+                else:
+                    groupsFor[nuisanceName] = [ groupName ]
+
+        #print self.DC.groups
+        #print groupsFor
+        for n in existingNuisanceNames:
+            # set an attribute related to the group(s) this nuisance belongs to
+            if n in groupsFor:
+                groupNames = groupsFor[n]
+                if self.options.verbose > 1:
+                    print 'Nuisance "%(n)s" is assigned to the following nuisance groups: %(groupNames)s' % locals()
+                for groupName in groupNames:
+                    self.out.var(n).setAttribute('group_'+groupName,True)
+
         for groupName,nuisanceNames in self.DC.groups.iteritems():
 	    nuisanceargset = ROOT.RooArgSet()
             for nuisanceName in nuisanceNames:
 		nuisanceargset.add(self.out.var(nuisanceName))
 	    self.out.defineSet("group_%s"%groupName,nuisanceargset)
+
 
     def doExpectedEvents(self):
         self.doComment(" --- Expected events in each bin, for each process ----")
@@ -481,7 +507,7 @@ class ModelBuilder(ModelBuilderBase):
         if self.options.out == None: raise RuntimeException
         for nuis,warn in self.DC.flatParamNuisances.iteritems():
             if self.out.var(nuis): self.out.var(nuis).setAttribute("flatParam")
-            elif warn: stderr.write("Missing variable %s declared as flatParam\n" % nuis)
+            elif warn: stderr.write("Missing variable %s declared as flatParam, will create one!\n" % nuis)	
         mc_s = ROOT.RooStats.ModelConfig("ModelConfig",       self.out)
         mc_b = ROOT.RooStats.ModelConfig("ModelConfig_bonly", self.out)
         for (l,mc) in [ ('s',mc_s), ('b',mc_b) ]:
