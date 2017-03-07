@@ -46,6 +46,7 @@
 #include "HiggsAnalysis/CombinedLimit/interface/RooAtlasBinPdf.h"
 #include "HiggsAnalysis/CombinedLimit/interface/RooAtlas6ParamBinPdf.h"
 #include "HiggsAnalysis/CombinedLimit/interface/PdfDiagonalizer.h"
+#include "HiggsAnalysis/CombinedLimit/interface/RooDoubleCBFast.h"
 
 namespace {
     struct dictionary {
