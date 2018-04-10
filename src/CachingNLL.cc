@@ -20,6 +20,7 @@
 #include <HiggsAnalysis/CombinedLimit/interface/CachingMultiPdf.h>
 #include <HiggsAnalysis/CombinedLimit/interface/RooCheapProduct.h>
 #include <HiggsAnalysis/CombinedLimit/interface/Accumulators.h>
+#include "HiggsAnalysis/CombinedLimit/interface/Logger.h"
 #include "vectorized.h"
 
 namespace cacheutils {
@@ -163,14 +164,16 @@ cacheutils::ArgSetChecker::changed(bool updateIfChanged)
 
 cacheutils::ValuesCache::ValuesCache(const RooAbsCollection &params, int size) :
     size_(1),
-    maxSize_(size)
+    maxSize_(size),
+    directMode_(false)
 {
     assert(size <= MaxItems_);
     items[0] = new Item(params);
 }
 cacheutils::ValuesCache::ValuesCache(const RooAbsReal &pdf, const RooArgSet &obs, int size) :
     size_(1),
-    maxSize_(size)
+    maxSize_(size),
+    directMode_(false)
 {
     assert(size <= MaxItems_);
     std::auto_ptr<RooArgSet> params(pdf.getParameters(obs));
@@ -191,6 +194,9 @@ void cacheutils::ValuesCache::clear()
 
 std::pair<std::vector<Double_t> *, bool> cacheutils::ValuesCache::get() 
 {
+    if (directMode_) {
+        return std::pair<std::vector<Double_t> *, bool>(&items[0]->values, false);
+    }
     int found = -1; bool good = false;
     for (int i = 0; i < size_; ++i) {
         if (items[i]->good) {
@@ -250,6 +256,9 @@ cacheutils::CachingPdf::CachingPdf(RooAbsReal *pdf, const RooArgSet *obs) :
     cache_(*pdf_,*obs_),
     includeZeroWeights_(false)
 {
+    if (runtimedef::get("CACHINGPDF_DIRECT") || pdf->getAttribute("CachingPdf_Direct")) {
+        cache_.setDirectMode(true);
+    }
 }
 
 cacheutils::CachingPdf::CachingPdf(const CachingPdf &other) :
@@ -261,6 +270,10 @@ cacheutils::CachingPdf::CachingPdf(const CachingPdf &other) :
     cache_(*pdf_,*obs_),
     includeZeroWeights_(other.includeZeroWeights_)
 {
+    if (runtimedef::get("CACHINGPDF_DIRECT") || other.pdfOriginal_->getAttribute("CachingPdf_Direct")) {
+        cache_.setDirectMode(true);
+    }
+
 }
 
 cacheutils::CachingPdf::~CachingPdf() 
@@ -619,7 +632,7 @@ cacheutils::CachingAddNLL::evaluate() const
         if (basicIntegrals_) {
             double integral = (binWidths_.size() > 1) ? 
                                     vectorized::dot_product(pdfvals.size(), &pdfvals[0], &binWidths_[0]) :
-                                    binWidths_.front() * sumDefault(pdfvals);
+                                    binWidths_.front() * sumDefault<double>(pdfvals);
             if (basicIntegrals_ == 1) {
                 double refintegral = integrals_[itc - coeffs_.begin()]->getVal();
                 if (refintegral > 0) {
@@ -694,6 +707,7 @@ cacheutils::CachingAddNLL::evaluate() const
     double expectedEvents = (isRooRealSum_ && !expEventsNoNorm ? pdf_->getNorm(data_->get()) : sumCoeff);
     if (expectedEvents <= 0) {
         std::cout << "WARNING: underflow in total event yield for " << pdf_->GetName() << ", expected yield = " << expectedEvents << " (observed: " << sumWeights_ << ")" << std::endl;
+    	Logger::instance().log(std::string(Form("CachingNLL.cc: %d -- underflow (expected events <=0) in total event yield for %s, expected yield = %g (observed: %g)",__LINE__,pdf_->GetName(), expectedEvents, sumWeights_)),Logger::kLogLevelInfo,__func__);
         if (!CachingSimNLL::noDeepLEE_) logEvalError("Expected number of events is negative"); else CachingSimNLL::hasError_ = true;
         expectedEvents = 1e-6;
     }
@@ -977,7 +991,7 @@ cacheutils::CachingSimNLL::evaluate() const
     PerfCounter::add("CachingSimNLL::evaluate called");
 #endif
     static bool gentleNegativePenalty_ = runtimedef::get("GENTLE_LEE");
-    DefaultAccumulator ret = 0;
+    DefaultAccumulator<double> ret = 0;
     unsigned idx = 0;
     for (std::vector<CachingAddNLL*>::const_iterator it = pdfs_.begin(), ed = pdfs_.end(); it != ed; ++it, ++idx) {
         if (*it != 0) {
@@ -993,13 +1007,14 @@ cacheutils::CachingSimNLL::evaluate() const
         }
     }
     if (!constrainPdfs_.empty() || !constrainPdfsFast_.empty()) {
-        DefaultAccumulator ret2 = 0;
+        DefaultAccumulator<double> ret2 = 0;
         /// ============= GENERIC CONSTRAINTS  =========
         std::vector<double>::const_iterator itz = constrainZeroPoints_.begin();
         for (std::vector<RooAbsPdf *>::const_iterator it = constrainPdfs_.begin(), ed = constrainPdfs_.end(); it != ed; ++it, ++itz) { 
             double pdfval = (*it)->getVal(nuis_);
             if (!isnormal(pdfval) || pdfval <= 0) {
                 std::cout << "WARNING: underflow constraint pdf " << (*it)->GetName() << ", value = " << pdfval << std::endl;
+    		Logger::instance().log(std::string(Form("CachingNLL.cc: %d -- underflow (pdf evaluates to <=0) of constraint pdf %s, value = %g ",__LINE__,(*it)->GetName(), pdfval)),Logger::kLogLevelInfo,__func__);
                 if (gentleNegativePenalty_) { ret += 25; continue; }
                 if (!noDeepLEE_) logEvalError((std::string("Constraint pdf ")+(*it)->GetName()+" evaluated to zero, negative or error").c_str());
                 pdfval = 1e-9;
