@@ -13,7 +13,7 @@
 #include "TH1F.h"
 #include "TMatrix.h"
 #include "HiggsAnalysis/CombinedLimit/interface/CMSHistV.h"
-#include "HiggsAnalysis/CombinedLimit/interface/FastTemplate.h"
+#include "HiggsAnalysis/CombinedLimit/interface/FastTemplate_Old.h"
 #include "HiggsAnalysis/CombinedLimit/interface/SimpleCacheSentry.h"
 
 class CMSHistFuncWrapper;
@@ -141,6 +141,8 @@ class CMSHistFunc : public RooAbsReal {
   inline FastHisto const& cache() const { return rebin_ ? rebin_cache_ : cache_; }
 
   CMSHistFuncWrapper const* wrapper() const;
+
+  RooAbsReal const& getXVar() const;
 
   friend class CMSHistV<CMSHistFunc>;
 

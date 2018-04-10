@@ -9,7 +9,7 @@
 #include "RooRealProxy.h"
 #include "Rtypes.h"
 #include "TH1F.h"
-#include "HiggsAnalysis/CombinedLimit/interface/FastTemplate.h"
+#include "HiggsAnalysis/CombinedLimit/interface/FastTemplate_Old.h"
 #include "HiggsAnalysis/CombinedLimit/interface/SimpleCacheSentry.h"
 #include "HiggsAnalysis/CombinedLimit/interface/CMSHistFunc.h"
 #include "HiggsAnalysis/CombinedLimit/interface/CMSHistV.h"
@@ -29,6 +29,7 @@ private:
     std::vector<double> x1;
     std::vector<double> x2;
     std::vector<double> res;
+    std::vector<double> gobs;
     std::set<RooAbsArg*> dirty_prop;
     std::vector<RooRealVar*> push_res;
   };

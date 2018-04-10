@@ -36,6 +36,7 @@
 
 #include "HiggsAnalysis/CombinedLimit/interface/CloseCoutSentry.h"
 #include "HiggsAnalysis/CombinedLimit/interface/ProfilingTools.h"
+#include "HiggsAnalysis/CombinedLimit/interface/Logger.h"
 
 using namespace std;
 
@@ -331,6 +332,19 @@ bool utils::setAllConstant(const RooAbsCollection &coll, bool constant) {
     return changed;
 }
 
+TString utils::printRooArgAsString(RooAbsArg *a){
+    RooRealVar *v = dynamic_cast<RooRealVar *>(a);
+    if (v){
+      return TString::Format("%s = %g %s",v->GetName(), v->getVal(), v->isConstant() ? "(constant)":"");
+    } else {
+      RooCategory *cv = dynamic_cast<RooCategory *>(a);
+      if (cv){
+        return TString::Format("%s = %d %s",cv->GetName(), cv->getIndex(), cv->isConstant() ? "(constant)":"") ;
+      }
+    }
+    return "";
+}
+
 bool utils::checkModel(const RooStats::ModelConfig &model, bool throwOnFail) {
     bool ok = true; std::ostringstream errors; 
     std::auto_ptr<TIterator> iter;
@@ -532,17 +546,25 @@ TGraphAsymmErrors * utils::makeDataGraph(TH1 * dataHist, bool asDensity)
 {
     // Properly normalise 
     TGraphAsymmErrors * dataGraph = new TGraphAsymmErrors(dataHist->GetNbinsX());
+
+    dataHist->Sumw2(false);
+    dataHist->SetBinErrorOption(TH1::kPoisson);
+
     for (int b=1;b <= dataHist->GetNbinsX();b++){
 	double yv = dataHist->GetBinContent(b);
 	double bw = dataHist->GetBinWidth(b);
 
-	double up; 
-	double dn;
+	//double up; 
+	//double dn;
 
-	RooHistError::instance().getPoissonInterval(yv,dn,up,1);
+	//RooHistError::instance().getPoissonInterval(yv,dn,up,1);
 
-	double errlow  = (yv-dn);
-	double errhigh = (up-yv);
+	//double errlow  = (yv-dn);
+	//double errhigh = (up-yv);
+    //
+    double errlow = dataHist->GetBinErrorLow(b);
+    double errhigh = dataHist->GetBinErrorUp(b);
+
 
 	if (asDensity) {
 		yv/=bw;
@@ -553,6 +575,7 @@ TGraphAsymmErrors * utils::makeDataGraph(TH1 * dataHist, bool asDensity)
 	dataGraph->SetPoint(b-1,dataHist->GetBinCenter(b),yv);
 	dataGraph->SetPointError(b-1,bw/2,bw/2,errlow,errhigh);
     }
+
     return dataGraph;
 }
 
@@ -951,6 +974,10 @@ bool utils::anyParameterAtBoundaries( const RooArgSet &params, int verbosity ){
                 fprintf(CloseCoutSentry::trueStdOutGlobal(),"  [WARNING] Found [%s] at boundary. \n", (*a).GetName());
                 std::cout << "       "; (*a).Print();
             }
+	    
+            if( verbosity > 0 ){
+            	Logger::instance().log(std::string(Form("utils.cc: %d -- Found parameter %s at boundary (within ~1sigma): %g+/-%g",__LINE__,(*a).GetName(),(*a).getVal(),(*a).getError())),Logger::kLogLevelInfo,__func__);
+	    }
 
             timesFoundAtBoundary[varName]++;
         }
@@ -972,4 +999,11 @@ int utils::countFloating(const RooArgSet &params){
 		if (!a->isConstant()) count++;
         }
 	return count;
+}
+
+RooArgSet utils::returnAllVars(RooWorkspace *w){
+	// Helper function to retun *all* vars, including RooCategories in workspace
+	RooArgSet args(w->allVars());
+	args.add(w->allCats());
+	return args;
 }

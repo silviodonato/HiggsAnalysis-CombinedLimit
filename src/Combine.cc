@@ -60,6 +60,8 @@
 #include "HiggsAnalysis/CombinedLimit/interface/CascadeMinimizer.h"
 #include "HiggsAnalysis/CombinedLimit/interface/ProfilingTools.h"
 
+#include "HiggsAnalysis/CombinedLimit/interface/Logger.h"
+
 using namespace RooStats;
 using namespace RooFit;
 using namespace std;
@@ -73,7 +75,9 @@ TDirectory *writeToysHere = 0;
 TDirectory *readToysFromHere = 0;
 int  verbose = 1;
 bool withSystematics = 1;
+bool expectSignalSet_ = false;
 bool doSignificance_ = 0;
+bool expectSignalSet = 0;
 bool lowerLimit_ = 0;
 float cl = 0.95;
 bool bypassFrequentistFit_ = false;
@@ -97,10 +101,10 @@ Combine::Combine() :
     rMax_(std::numeric_limits<float>::quiet_NaN()) {
     namespace po = boost::program_options;
     statOptions_.add_options()
-      ("systematics,S", po::value<bool>(&withSystematics)->default_value(true), "Add systematic uncertainties")
+      ("systematics,S", po::value<bool>(&withSystematics)->default_value(true), "Include constrained systematic uncertainties, -S 0 will ignore systematics constraint terms in the datacard.")
       ("cl,C",   po::value<float>(&cl)->default_value(0.95), "Confidence Level")
-      ("rMin",   po::value<float>(&rMin_), "Override minimum value for signal strength")
-      ("rMax",   po::value<float>(&rMax_), "Override maximum value for signal strength")
+      ("rMin",   po::value<float>(&rMin_), "Override minimum value for signal strength (default is 0)")
+      ("rMax",   po::value<float>(&rMax_), "Override maximum value for signal strength (default is 20)")
       ("prior",  po::value<std::string>(&prior_)->default_value("flat"), "Prior to use, for methods that require it and if it's not already in the input file: 'flat' (default), '1/sqrt(r)'")
       ("significance", "Compute significance instead of upper limit (works only for some methods)")
       ("lowerLimit",   "Compute the lower limit instead of the upper limit (works only for some methods)")
@@ -132,11 +136,10 @@ Combine::Combine() :
       ("validateModel,V", "Perform some sanity checks on the model and abort if they fail.")
       ("saveToys",   "Save results of toy MC in output file")
       ("floatAllNuisances", po::value<bool>(&floatAllNuisances_)->default_value(false), "Make all nuisance parameters floating")
-      ("floatNuisances", po::value<string>(&floatNuisances_)->default_value(""), "Set to floating these nuisance parameters (note freeze will take priority over float)")
+      ("floatParameters", po::value<string>(&floatNuisances_)->default_value(""), "Set to floating these parameters (note freeze will take priority over float)")
       ("freezeAllGlobalObs", po::value<bool>(&freezeAllGlobalObs_)->default_value(true), "Make all global observables constant")
       ;
     miscOptions_.add_options()
-      ("newGenerator", po::value<bool>(&newGen_)->default_value(true), "Use new generator code for toys, fixes all issues with binned and mixed generation (equivalent of --newToyMC but affects the top-level toys from option '-t' instead of the ones within the HybridNew)")
       ("optimizeSimPdf", po::value<bool>(&optSimPdf_)->default_value(true), "Turn on special optimizations of RooSimultaneous. On by default, you can turn it off if it doesn't work for your workspace.")
       ("noMCbonly", po::value<bool>(&noMCbonly_)->default_value(false), "Don't create a background-only modelConfig")
       ("noDefaultPrior", po::value<bool>(&noDefaultPrior_)->default_value(false), "Don't create a default uniform prior")
@@ -167,6 +170,7 @@ void Combine::applyOptions(const boost::program_options::variables_map &vm) {
   hintUsesStatOnly_ = vm.count("hintStatOnly");
   saveWorkspace_ = vm.count("saveWorkspace");
   toysNoSystematics_ = vm.count("toysNoSystematics");
+  if (!withSystematics) toysNoSystematics_ = true;  // if no systematics, also don't expect them for the toys
   toysFrequentist_ = vm.count("toysFrequentist");
   if (toysNoSystematics_ && toysFrequentist_) throw std::logic_error("You can't set toysNoSystematics and toysFrequentist options at the same time");
   if (modelConfigNameB_.find("%s") != std::string::npos) {
@@ -180,6 +184,9 @@ void Combine::applyOptions(const boost::program_options::variables_map &vm) {
   saveToys_ = vm.count("saveToys");
   validateModel_ = vm.count("validateModel");
   const std::string &method = vm["method"].as<std::string>();
+  if (!(vm["expectSignal"].defaulted())) expectSignalSet_=true;
+  else expectSignalSet_=false;
+	
   if (method == "MultiDimFit" || ( method == "FitDiagnostics" && vm.count("justFit")) || method == "MarkovChainMC") {
     //CMSDAS new default,
     if (vm["noMCbonly"].defaulted()) noMCbonly_ = 1;
@@ -187,14 +194,18 @@ void Combine::applyOptions(const boost::program_options::variables_map &vm) {
   }
   if (!vm["prior"].defaulted()) noDefaultPrior_ = 0;
 
-  expectSignalSet_ = !vm["expectSignal"].defaulted();
   if( vm.count("LoadLibrary") ) {
     librariesToLoad_ = vm["LoadLibrary"].as<std::vector<std::string> >();
+  }
+
+  if (vm.count("keyword-value") ) {
+    modelPoints_ = vm["keyword-value"].as<std::vector<std::string> >();
   }
 }
 
 bool Combine::mklimit(RooWorkspace *w, RooStats::ModelConfig *mc_s, RooStats::ModelConfig *mc_b, RooAbsData &data, double &limit, double &limitErr) {
   TStopwatch timer;
+
   bool ret = false;
   try {
     double hint = 0, hintErr = 0; bool hashint = false;
@@ -206,6 +217,7 @@ bool Combine::mklimit(RooWorkspace *w, RooStats::ModelConfig *mc_s, RooStats::Mo
         } else {
             hashint = hintAlgo->run(w, mc_s, mc_b, data, hint, hintErr, 0);
         } 
+	w->loadSnapshot("clean");
     }
     limitErr = 0; // start with 0, as some algorithms don't compute it
     ret = algo->run(w, mc_s, mc_b, data, limit, limitErr, (hashint ? &hint : 0));    
@@ -225,19 +237,6 @@ bool Combine::mklimit(RooWorkspace *w, RooStats::ModelConfig *mc_s, RooStats::Mo
   return ret;
 }
 
-namespace { 
-    struct ToCleanUp {
-        TFile *tfile; std::string file, path;
-        ToCleanUp() : tfile(0), file(""), path("") {}
-        ~ToCleanUp() {
-            if (tfile) { tfile->Close(); delete tfile; }
-            if (!file.empty()) {  
-                if (unlink(file.c_str()) == -1) std::cerr << "Failed to delete temporary file " << file << ": " << strerror(errno) << std::endl;
-            }
-            if (!path.empty()) {  boost::filesystem::remove_all(path); }
-        }
-    };
-}
 void Combine::run(TString hlfFile, const std::string &dataset, double &limit, double &limitErr, int &iToy, TTree *tree, int nToys) {
   ToCleanUp garbageCollect; // use this to close and delete temporary files
 
@@ -269,6 +268,7 @@ void Combine::run(TString hlfFile, const std::string &dataset, double &limit, do
     if (verbose > 1)      options += TString::Format(" --verbose %d", verbose-1);
     if (algo->name() == "FitDiagnostics" || algo->name() == "MultiDimFit") options += " --for-fits";
     for(auto lib2l : librariesToLoad_ ) { options += TString::Format(" --LoadLibrary %s", lib2l.c_str() ); }
+    for(auto mp : modelPoints_) {options +=  TString::Format(" --keyword-value %s", mp.c_str() ) ;}
     //-- Text mode: old default
     //int status = gSystem->Exec("text2workspace.py "+options+" '"+txtFile+"' -o "+tmpFile+".hlf"); 
     //isTextDatacard = true; fileToLoad = tmpFile+".hlf";
@@ -549,7 +549,7 @@ void Combine::run(TString hlfFile, const std::string &dataset, double &limit, do
 	// also set ignoreConstraint flag for constraint PDF 
 	if ( w->pdf(Form("%s_Pdf",arg->GetName())) ) w->pdf(Form("%s_Pdf",arg->GetName()))->setAttribute("ignoreConstraint");
       }
-      if (verbose > 0) std::cout << "Redefining the POIs to be: "; newPOIs.Print("");
+      if (verbose > 0) { std::cout << "Redefining the POIs to be: "; newPOIs.Print(""); }
       mc->SetParametersOfInterest(newPOIs);
       POI = mc->GetParametersOfInterest();
       if (nuisances) {
@@ -570,7 +570,7 @@ void Combine::run(TString hlfFile, const std::string &dataset, double &limit, do
 
   if (floatNuisances_ != "") {
       RooArgSet toFloat((floatNuisances_=="all")?*nuisances:(w->argSet(floatNuisances_.c_str())));
-      if (verbose > 0) std::cout << "Set floating the following nuisance parameters: "; toFloat.Print("");
+      if (verbose > 0) {  std::cout << "Set floating the following parameters: "; toFloat.Print(""); }
       utils::setAllConstant(toFloat, false);
   }
   
@@ -601,7 +601,7 @@ void Combine::run(TString hlfFile, const std::string &dataset, double &limit, do
       }
 
       RooArgSet toFreeze((freezeNuisances_=="all")?*nuisances:(w->argSet(freezeNuisances_.c_str())));
-      if (verbose > 0) std::cout << "Freezing the following nuisance parameters: "; toFreeze.Print("");
+      if (verbose > 0) {  std::cout << "Freezing the following nuisance parameters: "; toFreeze.Print(""); }
       utils::setAllConstant(toFreeze, true);
       if (nuisances) {
           RooArgSet newnuis(*nuisances);
@@ -637,7 +637,7 @@ void Combine::run(TString hlfFile, const std::string &dataset, double &limit, do
 	  toFreeze.add(groupNuisances);
 	}
 	
-        if (verbose > 0) std::cout << "Freezing the following nuisance parameters: "; toFreeze.Print("");
+        if (verbose > 0) {  std::cout << "Freezing the following nuisance parameters: "; toFreeze.Print(""); }
         utils::setAllConstant(toFreeze, true);
         if (nuisances) {
           RooArgSet newnuis(*nuisances);
@@ -669,8 +669,9 @@ void Combine::run(TString hlfFile, const std::string &dataset, double &limit, do
   }
 
   if (withSystematics && nuisances == 0) {
-      std::cout << "The signal model has no nuisance parameters. Please run the limit tool with no systematics (option -S 0)." << std::endl;
+      std::cout << "The model has no constrained nuisance parameters. Please run the limit tool with no systematics (option -S 0)." << std::endl;
       std::cout << "To make things easier, I will assume you have done it." << std::endl;
+      if (verbose) Logger::instance().log(std::string(Form("Combine.cc: %d -- The signal model has no constrained nuisance parameters so I have assumed you don't need a pdf for them. Please re-run with -S 0 to be sure!",__LINE__)),Logger::kLogLevelInfo,__func__);
       withSystematics = false;
   } else if (!withSystematics && nuisances != 0) {
     std::cout << "Will set nuisance parameters to constants: " ;
@@ -692,8 +693,6 @@ void Combine::run(TString hlfFile, const std::string &dataset, double &limit, do
   addNuisances(nuisances);
   addPOI(POI);
 
-  w->saveSnapshot("clean", w->allVars());
-  
   tree_ = tree;
 
   // Set up additional branches 
@@ -790,7 +789,7 @@ void Combine::run(TString hlfFile, const std::string &dataset, double &limit, do
         ((RooRealVar*)POI->find("r"))->setVal(expectSignal_);
       }
       if (expectSignalSet_ && rInParamExp) {
-        std::cerr << "Warning: A value of r is specified in both the --setPhysicsModelParameters "
+        std::cerr << "Warning: A value of r is specified in both the --setParameters "
                      "and --expectSignal options. The argument of --expectSignal will take "
                      "precedence\n";
       }
@@ -799,12 +798,18 @@ void Combine::run(TString hlfFile, const std::string &dataset, double &limit, do
       }
     } else if (expectSignalSet_) {
       std::cerr << "Warning: option --expectSignal only applies to models with "
-                   "the POI \"r\", use --setPhysicsModelParameters to set the "
+                   "the POI \"r\", use --setParameters to set the "
                    "values of the POIs for toy generation in this model\n";
     }
   }
 
+
+  // Ok now we're ready to go lets save a "clean snapshot" for the current parameters state
+  // w->allVars() misses the RooCategories, useful for some things - so need to include them. Set up a utils function for that 
+  w->saveSnapshot("clean", utils::returnAllVars(w));
+  
   if (nToys <= 0) { // observed or asimov
+    w->saveSnapshot("toyGenSnapshot",utils::returnAllVars(w));
     iToy = nToys;
     if (iToy == -1) {
      if (readToysFromHere != 0){
@@ -814,7 +819,7 @@ void Combine::run(TString hlfFile, const std::string &dataset, double &limit, do
 	  readToysFromHere->ls();
 	  return;
 	}
-        if (toysFrequentist_ && newGen_ && mc->GetGlobalObservables()) {
+        if (toysFrequentist_ && mc->GetGlobalObservables()) {
             RooAbsCollection *snap = dynamic_cast<RooAbsCollection *>(readToysFromHere->Get("toys/toy_asimov_snapshot"));
             if (!snap) {
                 std::cerr << "Snapshot of global observables toy_asimov_snapshot not found in " << readToysFromHere->GetName() << ". List follows:\n";
@@ -823,41 +828,44 @@ void Combine::run(TString hlfFile, const std::string &dataset, double &limit, do
             }
             RooArgSet gobs(*mc->GetGlobalObservables());
             gobs.assignValueOnly(*snap);
-            w->saveSnapshot("clean", w->allVars());
+            w->saveSnapshot("clean", utils::returnAllVars(w));
         }
       }
       else{
         if (genPdf == 0) throw std::invalid_argument("You can't generate background-only toys if you have no background-only pdf in the workspace and you have set --noMCbonly");
-        if (newGen_) {
-            if (toysFrequentist_) {
-                w->saveSnapshot("reallyClean", w->allVars());
-                if (dobs == 0) throw std::invalid_argument("Frequentist Asimov datasets can't be generated without a real dataset to fit");
-                RooArgSet gobsAsimov;
-                utils::setAllConstant(*mc->GetParametersOfInterest(), true); // Fix poi, before fit
-                double poiVal = 0.;
-                if (mc->GetParametersOfInterest()->getSize()) {
-                  poiVal = dynamic_cast<RooRealVar *>(mc->GetParametersOfInterest()->first())->getVal();
-                }
-                dobs = asimovutils::asimovDatasetWithFit(mc, *dobs, gobsAsimov, !bypassFrequentistFit_, poiVal, verbose);
-                if (mc->GetGlobalObservables()) {
-                    RooArgSet gobs(*mc->GetGlobalObservables());
-                    gobs = gobsAsimov;
-                }
-                utils::setAllConstant(*mc->GetParametersOfInterest(), false);
-                w->saveSnapshot("clean", w->allVars());
-            } else {
-                toymcoptutils::SimPdfGenInfo newToyMC(*genPdf, *observables, !unbinned_); 
-                dobs = newToyMC.generateAsimov(weightVar_); // as simple as that
+        if (toysFrequentist_) {
+            w->saveSnapshot("reallyClean", utils::returnAllVars(w));
+            if (dobs == 0) throw std::invalid_argument("Frequentist Asimov datasets can't be generated without a real dataset to fit");
+            RooArgSet gobsAsimov;
+            utils::setAllConstant(*mc->GetParametersOfInterest(), true); // Fix poi, before fit
+            double poiVal = 0.;
+            if (mc->GetParametersOfInterest()->getSize()) {
+              poiVal = dynamic_cast<RooRealVar *>(mc->GetParametersOfInterest()->first())->getVal();
             }
-        } else if (isExtended) {
-            if (unbinned_) {
-                throw std::invalid_argument("Asimov datasets can only be generated binned");
-            } else {
-                dobs = genPdf->generateBinned(*observables,RooFit::Extended(),RooFit::Asimov());
+            dobs = asimovutils::asimovDatasetWithFit(mc, *dobs, gobsAsimov, !bypassFrequentistFit_, poiVal, verbose);
+            if (mc->GetGlobalObservables()) {
+                RooArgSet gobs(*mc->GetGlobalObservables());
+                gobs = gobsAsimov;
             }
-	} else {
-	  dobs = genPdf->generate(*observables,1,RooFit::Asimov());
-	}
+            utils::setAllConstant(*mc->GetParametersOfInterest(), false);
+            w->saveSnapshot("clean", utils::returnAllVars(w));
+        } else {
+            toymcoptutils::SimPdfGenInfo newToyMC(*genPdf, *observables, !unbinned_); 
+
+	    // print the values of the parameters used to generate the toy
+	    if (verbose > 2) {
+	      Logger::instance().log(std::string(Form("Combine.cc: %d -- Generate Asimov toy from parameter values ... ",__LINE__)),Logger::kLogLevelInfo,__func__);
+    	      std::auto_ptr<TIterator> iter(genPdf->getParameters((const RooArgSet*)0)->createIterator());
+    	      for (RooAbsArg *a = (RooAbsArg *) iter->Next(); a != 0; a = (RooAbsArg *) iter->Next()) {
+	  	TString varstring = utils::printRooArgAsString(a);
+	  	Logger::instance().log(std::string(Form("Combine.cc: %d -- %s",__LINE__,varstring.Data())),Logger::kLogLevelInfo,__func__);
+	      }
+	    }
+	    // Also save the current state of the tree here but specify the quantile as -2 (i.e not the default, something specific to the toys)
+	    if (saveToys_) commitPoint(false,-2);
+
+            dobs = newToyMC.generateAsimov(weightVar_,verbose); // as simple as that
+        }
       }
     } else if (dobs == 0) {
       std::cerr << "No observed data '" << dataset << "' in the workspace. Cannot compute limit.\n" << std::endl;
@@ -865,16 +873,19 @@ void Combine::run(TString hlfFile, const std::string &dataset, double &limit, do
     }
     if (saveToys_) {
 	writeToysHere->WriteTObject(dobs, "toy_asimov");
-        if (toysFrequentist_ && newGen_ && mc->GetGlobalObservables()) { 
+        if (toysFrequentist_ && mc->GetGlobalObservables()) { 
             RooAbsCollection *snap = mc->GetGlobalObservables()->snapshot();
             if (snap) writeToysHere->WriteTObject(snap, "toy_asimov_snapshot");
-            // to be seen whether I can delete it or not
         }
     }
     std::cout << "Computing results starting from " << (iToy == 0 ? "observation (a-posteriori)" : "expected outcome (a-priori)") << std::endl;
+    if (verbose) Logger::instance().log(std::string(Form("Combine.cc: %d -- Computing results starting from %s",__LINE__,(iToy == 0 ? "observation (a-posteriori)" : "expected outcome (a-priori)"))),Logger::kLogLevelInfo,__func__);
     if (MH) MH->setVal(mass_);    
     if (verbose > (isExtended ? 3 : 2)) utils::printRAD(dobs);
     if (mklimit(w,mc,mc_bonly,*dobs,limit,limitErr)) commitPoint(0,g_quantileExpected_); //tree->Fill();
+
+     // Set the global flag to write output to the tree again since some Methods overwrite this to avoid the fill above. 
+     toggleGlobalFillTree(true);
   }
   
   std::vector<double> limitHistory;
@@ -890,11 +901,11 @@ void Combine::run(TString hlfFile, const std::string &dataset, double &limit, do
     allFloatingParameters.remove(*mc->GetParametersOfInterest());
     int nFloatingNonPoiParameters = utils::countFloating(allFloatingParameters); 
     if (nFloatingNonPoiParameters && !toysNoSystematics_ && (readToysFromHere == 0)) {
-      if (nuisances == 0) throw std::logic_error("Running with systematics enabled, but nuisances not defined.");
+      if (nuisances == 0) throw std::logic_error("Running with systematic variation in toys enabled, but I found floating parameters (which are not POIs) but no constrain terms have been defined in the datacard. If this is ok, re-run with -S 0");
       nuisancePdf.reset(utils::makeNuisancePdf(expectSignal_ ||  setPhysicsModelParameterExpression_ != "" || noMCbonly_ ? *mc : *mc_bonly));
       if (toysFrequentist_) {
           if (mc->GetGlobalObservables() == 0) throw std::logic_error("Cannot use toysFrequentist with no global observables");
-          w->saveSnapshot("reallyClean", w->allVars());
+          w->saveSnapshot("reallyClean", utils::returnAllVars(w));
           if (!bypassFrequentistFit_) {
               utils::setAllConstant(*mc->GetParametersOfInterest(), true); 
               if (dobs == 0) throw std::logic_error("Cannot use toysFrequentist with no input dataset");
@@ -905,7 +916,7 @@ void Combine::run(TString hlfFile, const std::string &dataset, double &limit, do
                 minim.setStrategy(1);
                 minim.minimize();
                 utils::setAllConstant(*mc->GetParametersOfInterest(), false); 
-                w->saveSnapshot("frequentistPreFit", w->allVars());
+                w->saveSnapshot("clean", utils::returnAllVars(w));
           }
           if (nuisancePdf.get()) systDs = nuisancePdf->generate(*mc->GetGlobalObservables(), nToys);
       } else {
@@ -925,36 +936,42 @@ void Combine::run(TString hlfFile, const std::string &dataset, double &limit, do
 	  if (systDs) {
 	  	if (systDs->numEntries()>=iToy) *vars = *systDs->get(iToy-1);
 	  }
-          if (toysFrequentist_) w->saveSnapshot("clean", w->allVars());
+          if (toysFrequentist_) w->saveSnapshot("clean", utils::returnAllVars(w));
 	  if (verbose > 3) utils::printPdf(genPdf);
 	}
+	/* No longer need to set this because "clean" state is already set correctly even without toysFrequentist
         if (POI->find("r")) {
           if (expectSignal_) ((RooRealVar*)POI->find("r"))->setVal(expectSignal_);
         }
+	*/
 	std::cout << "Generate toy " << iToy << "/" << nToys << std::endl;
+	if (verbose > 2) {
+	  Logger::instance().log(std::string(Form("Combine.cc: %d -- Generating toy %d/%d, from parameter values ... ",__LINE__,iToy,nToys)),Logger::kLogLevelInfo,__func__);
+    	  std::auto_ptr<TIterator> iter(genPdf->getParameters((const RooArgSet*)0)->createIterator());
+    	  for (RooAbsArg *a = (RooAbsArg *) iter->Next(); a != 0; a = (RooAbsArg *) iter->Next()) {
+	  	TString varstring = utils::printRooArgAsString(a);
+	  	Logger::instance().log(std::string(Form("Combine.cc: %d -- %s",__LINE__,varstring.Data())),Logger::kLogLevelInfo,__func__);
+	  }
+	}
+
+	// Also save the current state of the tree here but specify the quantile as -2 (i.e not the default, something specific to the toys)
+	if (saveToys_) commitPoint(false,-2);
 	if (isExtended) {
-          if (newGen_) {
-            absdata_toy = newToyMC.generate(weightVar_); // as simple as that
-          } else if (unbinned_) {
-    	      absdata_toy = genPdf->generate(*observables,RooFit::Extended());
-          } else if (generateBinnedWorkaround_) {
-              std::auto_ptr<RooDataSet> unbinn(genPdf->generate(*observables,RooFit::Extended()));
-              absdata_toy = new RooDataHist("toy","binned toy", *observables, *unbinn);
-          } else {
-    	      absdata_toy = genPdf->generateBinned(*observables,RooFit::Extended());
-          }
+          absdata_toy = newToyMC.generate(weightVar_); // as simple as that
 	} else {
 	  RooDataSet *data_toy = genPdf->generate(*observables,1);
 	  absdata_toy = data_toy;
 	}
       } else {
+        w->loadSnapshot("clean"); // (*) this is needed in case running over toys+fits, to avoid starting from previous fit 
+				  //-- constraints are set to toy values if frequentist (below) or set back to 0 (unecessarily) here. 
 	absdata_toy = dynamic_cast<RooAbsData *>(readToysFromHere->Get(TString::Format("toys/toy_%d",iToy)));
 	if (absdata_toy == 0) {
 	  std::cerr << "Toy toy_"<<iToy<<" not found in " << readToysFromHere->GetName() << ". List follows:\n";
 	  readToysFromHere->ls();
 	  return;
 	}
-        if (toysFrequentist_ && newGen_ && mc->GetGlobalObservables()) {
+        if (toysFrequentist_ && mc->GetGlobalObservables()) {
             RooAbsCollection *snap = dynamic_cast<RooAbsCollection *>(readToysFromHere->Get(TString::Format("toys/toy_%d_snapshot",iToy)));
             if (!snap) {
                 std::cerr << "Snapshot of global observables toy_"<<iToy<<"_snapshot not found in " << readToysFromHere->GetName() << ". List follows:\n";
@@ -962,11 +979,14 @@ void Combine::run(TString hlfFile, const std::string &dataset, double &limit, do
                 return;
             }
             vars->assignValueOnly(*snap);
-            w->saveSnapshot("clean", w->allVars());
+	    // note, we save over the "clean" values also for the parameters, so we've made sure they are the same as they were in (*)
+            w->saveSnapshot("clean",utils::returnAllVars(w)); 
         }
       }
       if (verbose > (isExtended ? 3 : 2)) utils::printRAD(absdata_toy);
+      if (!toysFrequentist_) w->saveSnapshot("toyGenSnapshot",utils::returnAllVars(w));
       w->loadSnapshot("clean");
+      if (toysFrequentist_) w->saveSnapshot("toyGenSnapshot",utils::returnAllVars(w));
       //if (verbose > 1) utils::printPdf(w, "model_b");
       if (mklimit(w,mc,mc_bonly,*absdata_toy,limit,limitErr)) {
 	commitPoint(0,g_quantileExpected_);//tree->Fill();
@@ -974,12 +994,14 @@ void Combine::run(TString hlfFile, const std::string &dataset, double &limit, do
 	expLimit += limit; 
         limitHistory.push_back(limit);
       }
+      // Set the global flag to write output to the tree again since some Methods overwrite this to avoid the fill above. 
+      toggleGlobalFillTree(true);
+
       if (saveToys_) {
 	writeToysHere->WriteTObject(absdata_toy, TString::Format("toy_%d", iToy));
-        if (toysFrequentist_ && newGen_ && mc->GetGlobalObservables()) { 
+        if (toysFrequentist_ && mc->GetGlobalObservables()) { 
             RooAbsCollection *snap = mc->GetGlobalObservables()->snapshot();
             writeToysHere->WriteTObject(snap, TString::Format("toy_%d_snapshot", iToy));
-            // to be seen whether I can delete it or not
         }
       }
       delete absdata_toy;
