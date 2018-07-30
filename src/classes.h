@@ -35,6 +35,8 @@
 #include "HiggsAnalysis/CombinedLimit/interface/RooDijetBinPdf.h"
 #include "HiggsAnalysis/CombinedLimit/interface/RooDijet5ParamBinPdf.h"
 #include "HiggsAnalysis/CombinedLimit/interface/RooDijet6ParamBinPdf.h"
+#include "HiggsAnalysis/CombinedLimit/interface/RooDijet5ParamSilvioPdf.h"
+#include "HiggsAnalysis/CombinedLimit/interface/RooDijet6ParamSilvioPdf.h"
 #include "HiggsAnalysis/CombinedLimit/interface/RooDijet5ParamPolyExtBinPdf.h"
 #include "HiggsAnalysis/CombinedLimit/interface/RooDijet6ParamPolyExtBinPdf.h"
 #include "HiggsAnalysis/CombinedLimit/interface/RooDijet7ParamPolyExtBinPdf.h"

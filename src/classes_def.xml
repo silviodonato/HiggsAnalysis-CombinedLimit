@@ -120,6 +120,8 @@
 	<class name="RooDijetBinPdf" />	
 	<class name="RooDijet5ParamBinPdf" />	
 	<class name="RooDijet6ParamBinPdf" />	
+	<class name="RooDijet5ParamSilvioPdf" />	
+	<class name="RooDijet6ParamSilvioPdf" />	
 	<class name="RooDijet5ParamPolyExtBinPdf" />	
 	<class name="RooDijet6ParamPolyExtBinPdf" />	
 	<class name="RooDijet7ParamPolyExtBinPdf" />	
