@@ -65,14 +65,6 @@
 #include "HiggsAnalysis/CombinedLimit/interface/RooDijetFisherAlt6Pdf.h"
 #include "HiggsAnalysis/CombinedLimit/interface/RooDijetFisherAlt7Pdf.h"
 
-#include "HiggsAnalysis/CombinedLimit/interface/RooModExpBinPdf.h"
-#include "HiggsAnalysis/CombinedLimit/interface/RooDijet5ParamBinPdf.h"
-#include "HiggsAnalysis/CombinedLimit/interface/RooAtlasBinPdf.h"
-#include "HiggsAnalysis/CombinedLimit/interface/RooAtlas6ParamBinPdf.h"
-#include "HiggsAnalysis/CombinedLimit/interface/RooDijet4ParamSilvioPdf.h"
-#include "HiggsAnalysis/CombinedLimit/interface/RooDijet5ParamSilvioPdf.h"
-#include "HiggsAnalysis/CombinedLimit/interface/RooDijet6ParamSilvioPdf.h"
-
 #include "HiggsAnalysis/CombinedLimit/interface/RooPiecewisePolynomial.h"
 
 #include "HiggsAnalysis/CombinedLimit/interface/RooNCSplineCore.h"
